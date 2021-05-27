@@ -65,6 +65,7 @@ struct _interpreter {
     PyObject *s_python_function_hist;
     PyObject *s_python_function_imshow;
     PyObject *s_python_function_scatter;
+    PyObject *s_python_function_pcolormesh;
     PyObject *s_python_function_boxplot;
     PyObject *s_python_function_subplot;
     PyObject *s_python_function_subplot2grid;
@@ -241,6 +242,7 @@ private:
         s_python_function_fill_between = safe_import(pymod, "fill_between");
         s_python_function_hist = safe_import(pymod,"hist");
         s_python_function_scatter = safe_import(pymod,"scatter");
+        s_python_function_pcolormesh = safe_import(pymod,"pcolormesh");
         s_python_function_boxplot = safe_import(pymod,"boxplot");
         s_python_function_subplot = safe_import(pymod, "subplot");
         s_python_function_subplot2grid = safe_import(pymod, "subplot2grid");
@@ -350,10 +352,10 @@ template <> struct select_npy_type<uint64_t> { const static NPY_TYPES type = NPY
 
 // Sanity checks; comment them out or change the numpy type below if you're compiling on
 // a platform where they don't apply
-static_assert(sizeof(long long) == 8);
-template <> struct select_npy_type<long long> { const static NPY_TYPES type = NPY_INT64; };
-static_assert(sizeof(unsigned long long) == 8);
-template <> struct select_npy_type<unsigned long long> { const static NPY_TYPES type = NPY_UINT64; };
+//static_assert(sizeof(long long) == 8);
+//template <> struct select_npy_type<long long> { const static NPY_TYPES type = NPY_INT64; };
+//static_assert(sizeof(unsigned long long) == 8);
+//template <> struct select_npy_type<unsigned long long> { const static NPY_TYPES type = NPY_UINT64; };
 
 template<typename Numeric>
 PyObject* get_array(const std::vector<Numeric>& v)
@@ -1155,6 +1157,40 @@ bool scatter(const std::vector<NumericX>& x,
   if (res) Py_DECREF(res);
   return res;
 
+}
+
+template<typename NumericX, typename NumericY, typename NumericZ>
+bool pcolormesh(const std::vector<NumericX>& x,
+             const std::vector<NumericY>& y,
+             const std::vector<::std::vector<NumericZ>> &z,
+             const std::map<std::string, std::string> & keywords = {})
+{
+  assert(x.size() == y.size());
+
+  detail::_interpreter::get();
+
+  PyObject* xarray = detail::get_array(x);
+  PyObject* yarray = detail::get_array(y);
+  PyObject* zarray = detail::get_2darray(z);
+
+  PyObject* kwargs = PyDict_New();
+  for (const auto& it : keywords)
+  {
+    PyDict_SetItemString(kwargs, it.first.c_str(), PyString_FromString(it.second.c_str()));
+  }
+
+  PyObject* plot_args = PyTuple_New(3);
+  PyTuple_SetItem(plot_args, 0, xarray);
+  PyTuple_SetItem(plot_args, 1, yarray);
+  PyTuple_SetItem(plot_args, 2, zarray);
+
+  PyObject* res = PyObject_Call(detail::_interpreter::get().s_python_function_pcolormesh, plot_args, kwargs);
+
+  Py_DECREF(plot_args);
+  Py_DECREF(kwargs);
+  if(res) Py_DECREF(res);
+
+  return res;
 }
 
 template<typename Numeric>
